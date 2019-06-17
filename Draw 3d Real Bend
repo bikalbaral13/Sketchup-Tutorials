@@ -1,0 +1,94 @@
+# Default code, use or delete...
+mod = Sketchup.active_model # Open model
+ent = mod.entities # All entities in model
+sel = mod.selection # Current selection
+
+
+def get_flat_ring(center1,vector1,rad_big,rad_small,num_edges)
+# Default code, use or delete...
+mod = Sketchup.active_model # Open model
+ent = mod.entities # All entities in model
+sel = mod.selection # Current selection
+
+big_circle=ent.add_circle(center1,vector1,rad_big,num_edges)
+big_face=ent.add_face(big_circle)
+small_circle=ent.add_circle(center1,vector1,rad_small,num_edges)
+ent[-1].erase!
+
+return big_face
+end
+
+
+def draw_bend(bend_angle,bend_length,radius,inner_thickness,outer_thickness,start_offset,end_offset,num_edges)
+mod = Sketchup.active_model # Open model
+ent = mod.entities # All entities in model
+sel = mod.selection # Current selection
+
+#finding the curve radius
+curve_rad=bend_length/(180.degrees-bend_angle)
+
+line_first=ent.add_line([curve_rad,0,0],[curve_rad,0,start_offset.abs])
+arc=ent.add_arc([0,0,0],[1,0,0],[0,1,0],curve_rad,0,180.degrees-bend_angle,num_edges)
+last_point=arc[-1].vertices[1].position
+subtended_angle=Math.atan(end_offset.abs/curve_rad)+180.degrees-bend_angle
+polar_distance=(curve_rad**2+end_offset**2)**0.5
+ex_point=[polar_distance*Math.cos(subtended_angle),0,-polar_distance*Math.sin(subtended_angle)]
+
+#getting Last line after the arc
+line_last=ent.add_line(last_point,ex_point)
+
+#putting Steps in order for running according to the criteria
+if start_offset>0 
+outer_ring=get_flat_ring([curve_rad,0,start_offset],[0,0,1],radius+outer_thickness,radius,num_edges)
+inner_ring=get_flat_ring([curve_rad,0,0],[0,0,1],radius,radius-inner_thickness,num_edges)
+
+elsif start_offset<0
+outer_ring=get_flat_ring([curve_rad,0,0],[0,0,1],radius+outer_thickness,radius,num_edges)
+inner_ring=get_flat_ring([curve_rad,0,-start_offset],[0,0,1],radius,radius-inner_thickness,num_edges)
+end
+
+if end_offset>0 and start_offset>0
+inner_ring.followme(arc)
+arc[num_edges]=line_last
+arc[num_edges+1]=line_first
+outer_ring.followme(arc)
+
+elsif end_offset<0 and start_offset<0
+outer_ring.followme(arc)
+arc[num_edges]=line_last
+arc[num_edges+1]=line_first
+inner_ring.followme(arc)
+elsif end_offset<0 and start_offset>0
+arc[num_edges]=line_last
+inner_ring.followme(arc)
+arc[-1].erase!
+arc[num_edges]=line_first
+outer_ring.followme(arc)
+elsif end_offset>0 and start_offset<0
+arc[num_edges]=line_last
+outer_ring.followme(arc)
+arc[-1].erase!
+arc[num_edges]=line_first
+inner_ring.followme(arc)
+end
+
+#erasing the central arc
+for i in 0..arc.length-1
+arc[i].erase!
+end
+
+end
+
+#getting Offsets for Pipe connection
+start_offset=3
+end_offset=-5
+
+#main Entries
+bend_angle=120.degrees
+num_edges=24
+bend_length=50.0
+radius1=3
+inner_thickness=0.5
+outer_thickness=1
+
+draw_bend(bend_angle,bend_length,radius1,inner_thickness,outer_thickness,start_offset,end_offset,num_edges)
